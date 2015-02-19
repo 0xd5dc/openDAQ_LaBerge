@@ -4,6 +4,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 from opendaq import *
 import numpy as np
+from simulator import save_to_csv
+
+OUTPUT_FILE_NAME='mv_log'
 
 GAINx05 = 0  # +-12V
 GAINx1 = 1  # +-4V
@@ -13,14 +16,14 @@ GAINx100 = 4  # +-0.04V
 
 # Connect to the device
 dq = DAQ('/dev/tty.SLAB_USBtoUART')  #Serial port of opedDAQ device
-period = 6  #period = 6ms
-numberPoints1 = 40  #collect 40 data-points
+period = 1  #period = 1ms
+numberPoints1 = 16  #collect 16 data-points
 pinput1 = 4  #A4 as single ended input
 ninput1 = 0  #negative-input=GND
 nSamples1 = 20  #Mean of 20 samples per plotted data-point (10 micro-second period)
 gain = GAINx10  #+-0.4V input maximum corresponding to x10 gain
 
-numberPoints2 = 40
+numberPoints2 = 16
 pinput2 = 5
 ninput2 = 0
 nSamples2 = 20
@@ -46,43 +49,77 @@ while True:
         print "Stop received"
         break
 
-print "Raw values", data  #data are raw values from ADC
+print "Raw values", len(data)  #data are raw values from ADC
+print "Raw channels", len(channel)  #data are raw values from ADC
 
 gains, offset = dq.get_cal()  #use device calibration to convert raw values into voltage(mV)
 print "Gains", gains  #(for openDAQ (M) only !!!)
 print "Offset", offset
+def convert_to_mv(raw):
+    dataTemp = float(raw)
+    dataTemp *= -gains[gain]
+    dataTemp += offset[gain]
+    dataTemp /= 100000
+    return dataTemp
+
 
 data_mv = []
 step = 0
 csv_values = ['time_ms,voltage_mv,time']
 epoch = int(time.time())
 friendly_time = time.strftime('%Y-%m-%d at %H.%M.%S %p')
-for i in range(len(data)):
-    dataTemp = float(data[i])
-    dataTemp *= -gains[gain]
-    dataTemp += offset[gain]
-    dataTemp /= 100000
+
+for i in xrange(len(data)):
+    dataTemp = convert_to_mv(data[i])
+
     data_mv.append(dataTemp)
     col_time = friendly_time
     #col_time = epoch
     csv_values.append('%s,%s,%s' % (step, dataTemp, col_time))
     step += period
+
 print "Values in mv", data_mv
 #define X values for the plot
 plot_time = np.linspace(0, period * len(data_mv), len(data_mv))
 
 #Define plot, figure and chart
-fig = plt.figure()
-plt.xlabel("Time (ms)")
-plt.ylabel("Voltage (mV)")
-plt.title("My chart")
-fig.canvas.set_window_title("Example 1")
-plt.grid(color='gray', linestyle='dashed')
-plt.plot(plot_time, data_mv)
+# fig = plt.figure()
+# plt.xlabel("Time (ms)")
+# plt.ylabel("Voltage (mV)")
+# plt.title("My chart")
+# fig.canvas.set_window_title("Example 1")
+# plt.grid(color='gray', linestyle='dashed')
+# plt.plot(plot_time, data_mv)
 #Finally, show our chart
-plt.show()
+# plt.show()
 
-#Open a CSV file and write values to it
-file_name = friendly_time + '.csv'
-with open(file_name, 'w') as csv_file:
-    csv_file.write('\n'.join(csv_values))
+today=time.strftime('%Y-%m-%d')
+time_stamp=time.strftime('%H:%M%p')
+
+def find_peak(seqs):
+    """
+    find the peak of sine wave
+    :param seqs:
+    :return:
+    """
+    return .707*(abs(max(seqs))+abs(min(seqs)))/2
+def get_channels(data, channel):
+    # this is mocking function need to be fixed
+    c1,c2=[],[]
+    # for i in xrange(len(data)):
+    #     if channel[i]==0:
+    #         c1.append(data[i])
+    #     else:
+    #         c2.append(data[i])
+    c1,c2=data[:16],data[16:]
+    return find_peak(c1),find_peak(c2)
+
+c1,c2=get_channels(data,channel)
+
+c1,c2=convert_to_mv(c1),convert_to_mv(c2)
+
+output_data='{0},{1},{2},{3}\n'.format(today,time_stamp,c1,c2)
+"""
+output file in format of "date, time, channel1, channel2"
+"""
+save_to_csv(OUTPUT_FILE_NAME,output_data)

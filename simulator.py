@@ -23,7 +23,7 @@ def save_to_csv(file_name, csv_data):
     :param csv_data: csv string e.g. "1,2,3,4"
     :param filename: e.g. "output"
     """
-    with open('{0}.csv'.format(file_name), 'w') as csv_file:
+    with open('{0}.csv'.format(file_name), 'a') as csv_file:
         csv_file.write(csv_data)
 
 
